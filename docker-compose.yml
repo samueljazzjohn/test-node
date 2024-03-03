@@ -1,0 +1,52 @@
+version: '3.5'
+
+services:
+  traefik:
+    image: "traefik:v2.5"
+    container_name: "traefik"
+    command:
+      - "--log.level=WARN"
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
+      - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
+      - "--certificatesresolvers.myresolver.acme.email=tappiko.official@gmail.com"
+      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+    networks:
+      - docker_net   
+    ports:
+      - "443:443"
+      - "80:80"
+    volumes:
+      - "./letsencrypt:/letsencrypt"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+
+  test-node:
+    container_name:  "test-node"
+    build: 
+      dockerfile: ./Dockerfile
+    restart: always
+    logging:
+      options:
+        max-size: "50m"
+        max-file: "3"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.test-node.rule=Host(`$HOST`)"
+      - "traefik.http.routers.test-node.entrypoints=websecure"
+      - "traefik.http.routers.test-node.tls=true"
+      - "traefik.http.routers.test-node.tls.certresolver=myresolver"
+      - "traefik.http.services.test-node.loadbalancer.server.port=80"
+    env_file:
+      - .env
+    networks:
+      - docker_net
+    
+networks:
+  docker_net:
+    name: docker_net
